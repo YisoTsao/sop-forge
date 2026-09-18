@@ -99,7 +99,13 @@ DATA_DIR=.sop-forge
 4. 在新開的 Playwright Chromium 視窗中操作目標網站。
 5. 回到 SOP Forge，按下 `Stop and save session`。
 6. 編輯步驟文字、順序或截圖標註。
-7. 使用 `Preview HTML` 或 `Export PDF` 產生文件。
+7. 在主頁使用 `Preview/edit HTML` 開啟獨立 HTML 預覽/編輯頁，或使用 `Export PDF` 匯出文件。
+
+主頁的 Live Preview 是唯讀畫面，不提供步驟文字或 annotation 編輯。所有編輯都在 `Preview/edit HTML` 頁面執行；`/api/projects/:projectId/preview` 是唯讀 HTML，`/api/projects/:projectId/edit` 是可編輯 HTML。
+
+在編輯頁可以用 circle、rectangle、arrow、text 工具標註截圖。選取物件後可移動、縮放、旋轉或刪除，也可以調整顏色、undo/redo、縮放圖片，以及下載合併 annotation 後的 PNG。這些 annotation 會保存到 project，並在 `Export PDF` 產出的 PDF 中顯示。
+
+編輯資料目前同時支援 legacy `annotations` 與 versioned `editorDocument`。新的 document 使用相對於原始截圖的 normalized 座標，包含非破壞性的 crop、90 度旋轉、水平/垂直翻轉、樣式與 line/path/callout/marker/redaction 物件；既有四種 annotation 不需要先轉檔。純 geometry、command history、migration 與 static SVG renderer 位於 `packages/renderer/src/editor-core.ts` 和 `packages/renderer/src/editor-svg.ts`，唯讀 HTML/PDF 會排除 selection UI。pixelate redaction 在沒有 raster filter 的輸出路徑採 solid fallback，原始 screenshot asset 不會被覆寫。
 
 目前會捕捉 navigation、click、input、select，以及 Enter、Tab、Escape 鍵。密碼欄位只保存 `[REDACTED]`，不保存原始值。click 的截圖會在 click-time 優先保存，避免點擊後立即 navigation 導致截到下一頁。
 
