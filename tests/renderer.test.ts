@@ -48,12 +48,15 @@ describe('SOP HTML renderer', () => {
     const html = renderHtml(project, '/api/assets/', {
       editable: true,
       stepsApiUrl: '/api/projects/project-1/steps',
+      pdfUrl: '/api/projects/project-1/pdf',
     });
 
     expect(html).toContain('Edit step 1');
     expect(html).toContain('Save changes');
     expect(html).toContain('Remove step 1');
     expect(html).toContain('/api/projects/project-1/steps');
+    expect(html).toContain('data-export-pdf');
+    expect(html).toContain('/api/projects/project-1/pdf');
   });
 
   it('renders persisted annotations and an inline annotation editor', () => {
@@ -76,18 +79,115 @@ describe('SOP HTML renderer', () => {
       stepsApiUrl: '/api/projects/project-1/steps',
     });
 
-    expect(html).toContain('data-annotation-type="circle"');
-    expect(html).toContain('data-annotation-type="rectangle"');
-    expect(html).toContain('data-annotation-type="arrow"');
-    expect(html).toContain('Click &amp; save');
+    expect(html).toContain('data-fabric-editor');
+    expect(html).toContain('data-editor-document');
     expect(html).toContain('data-tool="circle"');
     expect(html).toContain('data-tool="rectangle"');
     expect(html).toContain('data-tool="arrow"');
     expect(html).toContain('data-tool="text"');
-    expect(html).toContain('Zoom in');
+    expect(html).toContain('data-tool="pen"');
+    expect(html).toContain('data-tool="redaction"');
+    expect(html).not.toContain('data-zoom="in"');
+    expect(html).not.toContain('data-zoom="out"');
+    expect(html).not.toContain('data-zoom="reset"');
     expect(html).toContain('Undo');
     expect(html).toContain('Redo');
     expect(html).toContain('Delete selected annotation');
+    expect(html).toContain('data-action="duplicate"');
+    expect(html).toContain('Download annotated image');
+    expect((html.match(/<button type="button" data-tool=/g) ?? []).length).toBe(9);
+    expect((html.match(/<button type="button" data-tool=[^>]*>[\s\S]*?<svg viewBox="0 0 24 24"/g) ?? []).length).toBe(9);
+    expect(html).not.toContain('data-tool="marker"');
+    expect(html).toContain('SopForgeFabricEditor');
+    expect(html).not.toContain('window.prompt(\'Text annotation\')');
+  });
+
+  it('renders annotation rotation in read-only HTML for PDF export', () => {
+    const annotatedProject: Project = {
+      ...project,
+      steps: [{
+        ...project.steps[0]!,
+        screenshotAssetId: 'asset-1',
+        annotations: [{
+          id: 'rectangle-rotated',
+          type: 'rectangle',
+          x: 0.1,
+          y: 0.2,
+          width: 0.4,
+          height: 0.3,
+          rotation: 28,
+          color: '#167c55',
+        }],
+      }],
+      assets: [{ id: 'asset-1', kind: 'annotated', status: 'ready', relativePath: 'projects/project-1/assets/asset-1.png', mimeType: 'image/png', width: 1280, height: 720 }],
+    };
+
+    const html = renderHtml(annotatedProject, '/api/assets/');
+
+    expect(html).toContain('data-annotation-type="rectangle"');
+    expect(html).toContain('transform="rotate(28 0.30000000000000004 0.35)"');
+    expect(html).not.toContain('data-annotation-tools');
+  });
+
+  it('embeds an offline Fabric editor for editable screenshots', () => {
+    const html = renderHtml({
+      ...project,
+      steps: [{
+        ...project.steps[0]!,
+        screenshotAssetId: 'asset-1',
+        annotations: [{
+          id: 'circle-1',
+          type: 'circle',
+          x: 0.25,
+          y: 0.4,
+          radius: 0.08,
+          color: '#ff7a45',
+        }],
+      }],
+      assets: [{
+        id: 'asset-1',
+        kind: 'annotated',
+        status: 'ready',
+        relativePath: 'projects/project-1/assets/asset-1.png',
+        mimeType: 'image/png',
+        width: 1280,
+        height: 720,
+      }],
+    }, '/api/assets/', {
+      editable: true,
+      stepsApiUrl: '/api/projects/project-1/steps',
+    });
+
+    expect(html).toContain('data-fabric-editor');
+    expect(html).toContain('SopForgeFabricEditor');
+    expect(html).toContain('data-tool="pen"');
+    expect(html).toContain('data-tool="redaction"');
+    expect(html).toContain('data-action="duplicate"');
+    expect(html).toContain('data-action="bring-forward"');
+    expect(html).not.toContain('<script src="https://');
+    expect(html).toContain('class Arrow extends fabricApi.Line');
+    expect(html).toContain("this.type = 'arrow'");
+    expect(html).toContain("tool === 'highlighter'");
+    expect(html).toContain("canvas.on('selection:created'");
+    expect(html).toContain("canvas.on('object:removed'");
+    expect(html).toContain("historyIndex");
+    expect(html).toContain('backstoreOnly: true');
+    expect(html).toContain('new fabricApi.PencilBrush(canvas)');
+    expect(html).toContain("const pathOpacity = tool === 'highlighter' ? 0.35 : opacity;");
+    expect(html).toContain('event.path.set({ stroke: color, opacity: pathOpacity');
+    expect(html).toContain('style: defaultStyle({ stroke: color, opacity: pathOpacity, strokeWidth: brushWidth })');
+    expect(html).toContain("document.addEventListener('keydown'");
+    expect(html).toContain('bringObjectToFront');
+    expect(html).toContain('sendObjectToBack');
+    expect(html).toContain("let fill = options.fill || 'transparent'");
+    expect(html).toContain("style.fill && style.fill !== 'transparent' ? style.fill : '#ffffff'");
+    expect(html).toContain("hoverCursor: 'move'");
+    expect(html).toContain("options.onToolChange?.('select')");
+    expect(html).toContain('history = [snapshot()]');
+    expect(html).toContain("event.key.toLowerCase() === 'z'");
+    expect(html).toContain('data-stroke-width');
+    expect(html).toContain('max="0.08"');
+    expect(html).toContain('Stroke thickness');
   });
 
 });

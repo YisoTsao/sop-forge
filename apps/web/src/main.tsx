@@ -1,6 +1,6 @@
 import { StrictMode, useEffect, useState, startTransition } from "react";
 import { createRoot } from "react-dom/client";
-import type { Project, Step } from "../../../packages/domain/src/index.js";
+import type { Project } from "../../../packages/domain/src/index.js";
 import "./styles.css";
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
@@ -29,108 +29,12 @@ function statusLabel(status: Project["status"] | "idle"): string {
   }[status];
 }
 
-function StepCard({
-  step,
-  asset,
-  index,
-  count,
-  onChange,
-  onMove,
-  onDelete,
-}: {
-  step: Step;
-  asset?: Project["assets"][number];
-  index: number;
-  count: number;
-  onChange: (patch: Partial<Step>) => void;
-  onMove: (direction: -1 | 1) => void;
-  onDelete: () => void;
-}) {
-  const thumbnailSrc =
-    asset?.status === "ready" && asset.relativePath
-      ? `/api/assets/${asset.relativePath}`
-      : undefined;
-
-  return (
-    <article className="step-card">
-      <div className="step-index">{String(index + 1).padStart(2, "0")}</div>
-      <div className="step-body">
-        <div className="step-toolbar">
-          <span className="action-label">{step.action}</span>
-          <div className="icon-actions">
-            <button
-              type="button"
-              aria-label="Move step up"
-              disabled={index === 0}
-              onClick={() => onMove(-1)}
-            >
-              ↑
-            </button>
-            <button
-              type="button"
-              aria-label="Move step down"
-              disabled={index === count - 1}
-              onClick={() => onMove(1)}
-            >
-              ↓
-            </button>
-            <button
-              type="button"
-              aria-label="Delete step"
-              className="quiet-danger"
-              onClick={onDelete}
-            >
-              ×
-            </button>
-          </div>
-        </div>
-        <input
-          className="step-title"
-          value={step.title}
-          onChange={(event) => onChange({ title: event.target.value })}
-          aria-label={`Step ${index + 1} title`}
-        />
-        <textarea
-          value={step.description}
-          onChange={(event) => onChange({ description: event.target.value })}
-          aria-label={`Step ${index + 1} description`}
-          rows={2}
-        />
-        {thumbnailSrc ? (
-          <img
-            className="step-thumbnail"
-            src={thumbnailSrc}
-            alt={`Screenshot for step ${index + 1}`}
-          />
-        ) : null}
-        {step.screenshotAssetId && asset?.status === "unavailable" ? (
-          <div className="asset-note missing">Screenshot unavailable</div>
-        ) : step.screenshotAssetId ? (
-          <div className="asset-note">
-            Screenshot captured · {step.screenshotAssetId.slice(-8)}
-          </div>
-        ) : (
-          <div className="asset-note missing">No screenshot available</div>
-        )}
-      </div>
-    </article>
-  );
-}
-
 export function App() {
   const [url, setUrl] = useState("https://");
   const [status, setStatus] = useState<Project["status"] | "idle">("idle");
   const [project, setProject] = useState<Project | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [editingPreviewStepId, setEditingPreviewStepId] = useState<
-    string | null
-  >(null);
-  const [previewDraft, setPreviewDraft] = useState({
-    title: "",
-    description: "",
-  });
 
   useEffect(() => {
     if (!sessionId) return;
@@ -200,26 +104,6 @@ export function App() {
     }
   }
 
-  async function saveSteps(steps: Step[]) {
-    if (!project) return;
-    setSaving(true);
-    try {
-      const saved = await request<Project>(
-        `/api/projects/${project.id}/steps`,
-        { method: "PATCH", body: JSON.stringify({ steps }) },
-      );
-      setProject(saved);
-    } catch (reason) {
-      setError(
-        reason instanceof Error
-          ? reason.message
-          : "Unable to save step changes.",
-      );
-    } finally {
-      setSaving(false);
-    }
-  }
-
   async function exportProjectPdf() {
     if (!project) return;
     setError(null);
@@ -236,62 +120,7 @@ export function App() {
     }
   }
 
-  function updateStep(stepId: string, patch: Partial<Step>) {
-    if (!project) return;
-    const steps = project.steps.map((step) =>
-      step.id === stepId ? { ...step, ...patch } : step,
-    );
-    setProject({ ...project, steps });
-  }
-
-  function beginPreviewEdit(step: Step) {
-    setEditingPreviewStepId(step.id);
-    setPreviewDraft({ title: step.title, description: step.description });
-  }
-
-  function cancelPreviewEdit() {
-    setEditingPreviewStepId(null);
-    setPreviewDraft({ title: "", description: "" });
-  }
-
-  async function savePreviewEdit(stepId: string) {
-    if (!project || !previewDraft.title.trim()) return;
-    const steps = project.steps.map((step) =>
-      step.id === stepId
-        ? {
-            ...step,
-            title: previewDraft.title.trim(),
-            description: previewDraft.description,
-          }
-        : step,
-    );
-    setProject({ ...project, steps });
-    cancelPreviewEdit();
-    await saveSteps(steps);
-  }
-
-  async function removePreviewStep(stepId: string) {
-    if (!project || !window.confirm("Remove this step from the SOP?")) return;
-    const steps = project.steps
-      .filter((step) => step.id !== stepId)
-      .map((step, order) => ({ ...step, order }));
-    setProject({ ...project, steps });
-    cancelPreviewEdit();
-    await saveSteps(steps);
-  }
-
-  function moveStep(index: number, direction: -1 | 1): Step[] | null {
-    if (!project) return null;
-    const steps = [...project.steps];
-    const target = index + direction;
-    if (target < 0 || target >= steps.length) return null;
-    [steps[index], steps[target]] = [steps[target]!, steps[index]!];
-    const reordered = steps.map((step, order) => ({ ...step, order }));
-    setProject({ ...project, steps: reordered });
-    return reordered;
-  }
-
-  const previewUrl = project ? `/api/projects/${project.id}/preview` : "";
+  const editUrl = project ? `/api/projects/${project.id}/edit` : "";
   const assetsById = new Map(
     project?.assets.map((asset) => [asset.id, asset]) ?? [],
   );
@@ -401,16 +230,15 @@ export function App() {
             <h2>{project?.title ?? "Your captured steps will appear here"}</h2>
           </div>
           <div className="workspace-actions">
-            {saving && <span className="saving-label">Saving…</span>}
             {project && (
               <>
                 <a
                   className="outline-button"
-                  href={previewUrl}
+                  href={editUrl}
                   target="_blank"
                   rel="noreferrer"
                 >
-                  Preview HTML ↗
+                  Preview/edit HTML ↗
                 </a>
                 <button
                   className="primary-button"
@@ -423,58 +251,7 @@ export function App() {
             )}
           </div>
         </div>
-        <div className="workspace-grid">
-          <div className="steps-column">
-            {project?.steps.length ? (
-              project.steps
-                .slice()
-                .sort((left, right) => left.order - right.order)
-                .map((step, index, steps) => (
-                  <StepCard
-                    key={step.id}
-                    step={step}
-                    asset={
-                      step.screenshotAssetId
-                        ? assetsById.get(step.screenshotAssetId)
-                        : undefined
-                    }
-                    index={index}
-                    count={steps.length}
-                    onChange={(patch) => updateStep(step.id, patch)}
-                    onMove={(direction) => {
-                      const reordered = moveStep(index, direction);
-                      if (reordered) void saveSteps(reordered);
-                    }}
-                    onDelete={() => {
-                      const steps = project.steps
-                        .filter((candidate) => candidate.id !== step.id)
-                        .map((candidate, order) => ({ ...candidate, order }));
-                      setProject({ ...project, steps });
-                      void saveSteps(steps);
-                    }}
-                  />
-                ))
-            ) : (
-              <div className="empty-state">
-                <div className="empty-icon">◎</div>
-                <h3>Waiting for your first action</h3>
-                <p>
-                  Start a recording and use the separate browser window. Each
-                  meaningful click, input, and navigation will become an
-                  editable step here.
-                </p>
-              </div>
-            )}
-            {project && project.steps.length > 0 && (
-              <button
-                className="save-button"
-                type="button"
-                onClick={() => void saveSteps(project.steps)}
-              >
-                Save step edits
-              </button>
-            )}
-          </div>
+        <div className="workspace-preview-only">
           <aside className="preview-panel">
             <div className="preview-header">
               <span>LIVE PREVIEW</span>
@@ -499,71 +276,7 @@ export function App() {
                       <div className="preview-thumbnail-meta">
                         <span>{String(index + 1).padStart(2, "0")}</span>
                         <strong>{step.action}</strong>
-                        <button
-                          type="button"
-                          className="preview-edit-button"
-                          aria-label={`Edit step ${index + 1}`}
-                          onClick={() => beginPreviewEdit(step)}
-                        >
-                          Edit
-                        </button>
                       </div>
-                      {editingPreviewStepId === step.id ? (
-                        <div className="preview-editor">
-                          <label>
-                            Title
-                            <input
-                              aria-label={`Preview step ${index + 1} title`}
-                              value={previewDraft.title}
-                              onChange={(event) =>
-                                setPreviewDraft({
-                                  ...previewDraft,
-                                  title: event.target.value,
-                                })
-                              }
-                            />
-                          </label>
-                          <label>
-                            Content
-                            <textarea
-                              aria-label={`Preview step ${index + 1} content`}
-                              value={previewDraft.description}
-                              onChange={(event) =>
-                                setPreviewDraft({
-                                  ...previewDraft,
-                                  description: event.target.value,
-                                })
-                              }
-                              rows={4}
-                            />
-                          </label>
-                          <div className="preview-editor-actions">
-                            <button
-                              type="button"
-                              className="preview-save-button"
-                              disabled={!previewDraft.title.trim() || saving}
-                              onClick={() => void savePreviewEdit(step.id)}
-                            >
-                              Save
-                            </button>
-                            <button
-                              type="button"
-                              className="preview-cancel-button"
-                              onClick={cancelPreviewEdit}
-                            >
-                              Cancel
-                            </button>
-                            <button
-                              type="button"
-                              className="preview-remove-button"
-                              aria-label={`Remove preview step ${index + 1}`}
-                              onClick={() => void removePreviewStep(step.id)}
-                            >
-                              Remove step
-                            </button>
-                          </div>
-                        </div>
-                      ) : null}
                       {imageSrc && !repeated ? (
                         <img
                           src={imageSrc}

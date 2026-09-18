@@ -103,12 +103,13 @@ describe('domain contracts', () => {
       sourceEventIds: ['event-1'],
       annotations: [
         { id: 'circle-1', type: 'circle', x: 0.25, y: 0.4, radius: 0.08, color: '#ff7a45' },
-        { id: 'rectangle-1', type: 'rectangle', x: 0.1, y: 0.2, width: 0.4, height: 0.3, color: '#167c55' },
+        { id: 'rectangle-1', type: 'rectangle', x: 0.1, y: 0.2, width: 0.4, height: 0.3, rotation: 28, color: '#167c55' },
         { id: 'arrow-1', type: 'arrow', x1: 0.2, y1: 0.2, x2: 0.8, y2: 0.7, color: '#24382a' },
         { id: 'text-1', type: 'text', x: 0.3, y: 0.6, text: 'Click here', color: '#24382a', fontSize: 0.04 },
       ],
     });
 
     expect(step.annotations).toHaveLength(4);
+    expect(step.annotations?.find((annotation) => annotation.id === 'rectangle-1')?.rotation).toBe(28);
   });
 });
