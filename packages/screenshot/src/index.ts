@@ -40,8 +40,14 @@ export async function annotateScreenshot(
       }
     : undefined;
 
-  const marker = coordinate
-    ? `<circle cx="${escapeSvg(coordinate.x)}" cy="${escapeSvg(coordinate.y)}" r="18" fill="none" stroke="#ff7a45" stroke-width="4"/><circle cx="${escapeSvg(coordinate.x)}" cy="${escapeSvg(coordinate.y)}" r="4" fill="#ff7a45"/>`
+  const markerPoint = coordinate ?? (boundingBox
+    ? {
+        x: boundingBox.x + boundingBox.width / 2,
+        y: boundingBox.y + boundingBox.height / 2,
+      }
+    : undefined);
+  const marker = markerPoint
+    ? `<circle cx="${escapeSvg(markerPoint.x)}" cy="${escapeSvg(markerPoint.y)}" r="18" fill="none" stroke="#ff7a45" stroke-width="4"/><circle cx="${escapeSvg(markerPoint.x)}" cy="${escapeSvg(markerPoint.y)}" r="4" fill="#ff7a45"/>`
     : "";
   const overlay = Buffer.from(
     `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">${marker}</svg>`,

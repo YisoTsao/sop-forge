@@ -26,4 +26,15 @@ describe('screenshot annotation', () => {
     expect(result.annotated).toBe(false);
     expect(result.buffer.equals(original)).toBe(true);
   });
+
+  it('marks the center of a target bounding box when no click coordinates exist', async () => {
+    const original = await sharp({ create: { width: 120, height: 80, channels: 4, background: '#ffffff' } }).png().toBuffer();
+    const result = await annotateScreenshot(original, {
+      boundingBox: { x: 20, y: 15, width: 40, height: 30 },
+    });
+
+    const { data } = await sharp(result.buffer).raw().toBuffer({ resolveWithObject: true });
+    const centerOffset = (30 * 120 + 40) * 4;
+    expect([...data.subarray(centerOffset, centerOffset + 3)]).toEqual([255, 122, 69]);
+  });
 });
