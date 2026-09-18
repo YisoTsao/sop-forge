@@ -368,6 +368,14 @@ h2 {
   gap: 28px;
   padding-top: 28px;
 }
+.workspace-preview-only {
+  max-width: 900px;
+  margin: 0 auto;
+  padding-top: 28px;
+}
+.workspace-preview-only .preview-panel {
+  min-height: 680px;
+}
 .steps-column {
   display: grid;
   gap: 12px;

@@ -46,7 +46,7 @@ describe('recording workspace UI', () => {
     expect((await screen.findByRole('alert')).textContent).toContain('Please enter a valid URL.');
   });
 
-  it('renders, edits, reorders, deletes, and saves captured steps', async () => {
+  it('renders a read-only live preview with standalone edit and PDF actions', async () => {
     const fetchMock = vi.fn().mockImplementation((url: string, options?: RequestInit) => {
       if (url === '/api/sessions') return Promise.resolve(response({ sessionId: 'session-ui-test', projectId: project.id }));
       if (url === `/api/projects/${project.id}`) return Promise.resolve(response(project));
@@ -57,60 +57,13 @@ describe('recording workspace UI', () => {
     render(<App />);
 
     fireEvent.click(screen.getByRole('button', { name: /Start recording/i }));
-    expect(await screen.findByDisplayValue('First step')).toBeTruthy();
-    expect(await screen.findByAltText('Screenshot for step 1')).toBeTruthy();
-
-    fireEvent.change(screen.getByDisplayValue('First step'), { target: { value: 'Edited first step' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save step edits' }));
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(`/api/projects/${project.id}/steps`, expect.objectContaining({ method: 'PATCH' })));
-
-    const moveDown = screen.getAllByRole('button', { name: 'Move step down' }).find((button) => !button.hasAttribute('disabled'));
-    if (!moveDown) throw new Error('Expected a movable step.');
-    fireEvent.click(moveDown);
-    fireEvent.click(screen.getAllByRole('button', { name: 'Delete step' })[0]!);
-    await waitFor(() => expect(fetchMock.mock.calls.filter(([, options]) => (options as RequestInit | undefined)?.method === 'PATCH').length).toBeGreaterThanOrEqual(3));
-  });
-
-  it('opens preview step editing and removes the selected item', async () => {
-    const fetchMock = vi.fn().mockImplementation((url: string, options?: RequestInit) => {
-      if (url === '/api/sessions') return Promise.resolve(response({ sessionId: 'session-ui-test', projectId: project.id }));
-      if (url === `/api/projects/${project.id}`) return Promise.resolve(response(project));
-      if (options?.method === 'PATCH') return Promise.resolve(response(project));
-      return Promise.resolve(response({}));
-    });
-    vi.stubGlobal('fetch', fetchMock);
-    render(<App />);
-
-    fireEvent.click(screen.getByRole('button', { name: /Start recording/i }));
-    expect(await screen.findByRole('button', { name: 'Edit step 1' })).toBeTruthy();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Edit step 1' }));
-    const previewTitle = screen.getByRole('textbox', { name: 'Preview step 1 title' });
-    const previewContent = screen.getByRole('textbox', { name: 'Preview step 1 content' });
-    expect(previewTitle).toBeTruthy();
-    expect(previewContent).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Remove preview step 1' })).toBeTruthy();
-
-    fireEvent.change(previewTitle, { target: { value: 'Updated preview title' } });
-    fireEvent.change(previewContent, { target: { value: 'Updated preview content' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-    await waitFor(() => {
-      const patch = fetchMock.mock.calls.find(([, options]) => (options as RequestInit | undefined)?.method === 'PATCH');
-      expect(patch?.[1] && JSON.parse((patch[1] as RequestInit).body as string)).toMatchObject({
-        steps: expect.arrayContaining([
-          expect.objectContaining({ title: 'Updated preview title', description: 'Updated preview content' }),
-        ]),
-      });
-    });
-
-    vi.stubGlobal('confirm', vi.fn(() => true));
-    fireEvent.click(screen.getByRole('button', { name: 'Edit step 1' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Remove preview step 1' }));
-    await waitFor(() => {
-      const patches = fetchMock.mock.calls.filter(([, options]) => (options as RequestInit | undefined)?.method === 'PATCH');
-      const lastPayload = JSON.parse(patches.at(-1)?.[1]?.body as string);
-      expect(lastPayload.steps).toHaveLength(1);
-    });
+    expect(await screen.findByText('LIVE PREVIEW')).toBeTruthy();
+    expect(await screen.findByAltText('Preview screenshot for step 1')).toBeTruthy();
+    const editLink = screen.getByRole('link', { name: 'Preview/edit HTML ↗' });
+    expect(editLink.getAttribute('href')).toBe(`/api/projects/${project.id}/edit`);
+    expect(screen.getByRole('button', { name: 'Export PDF ↓' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Edit step 1' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Save step edits' })).toBeNull();
   });
 
   it('stops recording without sending an empty JSON body and keeps preview available', async () => {
@@ -133,11 +86,8 @@ describe('recording workspace UI', () => {
       expect((stopCall?.[1] as RequestInit).headers).not.toHaveProperty('content-type');
       expect((stopCall?.[1] as RequestInit).body).toBeUndefined();
     });
-    const previewLink = await screen.findByRole('link', { name: 'Preview HTML ↗' });
+    const previewLink = await screen.findByRole('link', { name: 'Preview/edit HTML ↗' });
     expect(screen.queryByRole('button', { name: 'Stop and save session' })).toBeNull();
-    expect(previewLink).toHaveAttribute(
-      'href',
-      `/api/projects/${project.id}/preview`,
-    );
+    expect(previewLink.getAttribute('href')).toBe(`/api/projects/${project.id}/edit`);
   });
 });

@@ -60,7 +60,7 @@ describe('local server API', () => {
     expect(response.statusCode).toBe(400);
   });
 
-  it('serves the project preview in editable mode', async () => {
+  it('serves separate read-only preview and editable HTML routes', async () => {
     const dataDir = await mkdtemp(path.join(os.tmpdir(), 'sop-forge-api-'));
     const storage = createStorage(dataDir);
     const adapter: BrowserAdapter = { launch: async () => ({}) as BrowserSession };
@@ -82,6 +82,12 @@ describe('local server API', () => {
 
     const response = await app.inject({ method: 'GET', url: `/api/projects/${project.id}/preview` });
     expect(response.statusCode).toBe(200);
-    expect(response.body).toContain('Edit step 1');
+    expect(response.body).not.toContain('Edit step 1');
+
+    const editResponse = await app.inject({ method: 'GET', url: `/api/projects/${project.id}/edit` });
+    expect(editResponse.statusCode).toBe(200);
+    expect(editResponse.body).toContain('Edit step 1');
+    expect(editResponse.body).toContain('data-export-pdf');
+    expect(editResponse.body).toContain(`/api/projects/${project.id}/pdf`);
   });
 });

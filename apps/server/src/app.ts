@@ -126,9 +126,24 @@ export async function buildApp(
       if (!project)
         return reply.code(404).send({ error: "Project not found." });
       return reply.type("text/html").send(
+        renderHtml(project, "/api/assets/"),
+      );
+    },
+  );
+
+  app.get<{ Params: { projectId: string } }>(
+    "/api/projects/:projectId/edit",
+    async (request, reply) => {
+      const project = dependencies.storage.projects.load(
+        request.params.projectId,
+      );
+      if (!project)
+        return reply.code(404).send({ error: "Project not found." });
+      return reply.type("text/html").send(
         renderHtml(project, "/api/assets/", {
           editable: true,
           stepsApiUrl: `/api/projects/${project.id}/steps`,
+          pdfUrl: `/api/projects/${project.id}/pdf`,
         }),
       );
     },
@@ -151,7 +166,11 @@ export async function buildApp(
         "sop.pdf",
       );
       try {
-        await exportPdf(html, outputPath);
+        await exportPdf(
+          html,
+          outputPath,
+          dependencies.publicBaseUrl ?? "http://127.0.0.1:3001",
+        );
         return reply.send(
           pdfResponseSchema.parse({
             path: outputPath,
