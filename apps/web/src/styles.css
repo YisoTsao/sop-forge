@@ -350,6 +350,13 @@ h2 {
 .outline-button {
   border: 1px solid #48584c;
   color: #c2d0c3;
+  background: transparent;
+  cursor: pointer;
+}
+.workspace-status {
+  margin-top: 12px;
+  color: #b6cb74;
+  font-size: 12px;
 }
 .outline-button:hover {
   border-color: #b6cb74;

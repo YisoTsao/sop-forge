@@ -19,7 +19,8 @@ import type { Storage } from "../../../packages/storage/src/index.js";
 export interface AppDependencies {
   manager: RecordingSessionManager;
   storage: Storage;
-  publicBaseUrl?: string;
+  publicBaseUrl?: string | (() => string);
+  webRoot?: string;
 }
 
 export async function buildApp(
@@ -31,6 +32,13 @@ export async function buildApp(
     root: dependencies.storage.dataDir,
     prefix: "/api/assets/",
   });
+  if (dependencies.webRoot) {
+    await app.register(staticPlugin, {
+      root: dependencies.webRoot,
+      prefix: "/",
+      decorateReply: false,
+    });
+  }
 
   app.get("/api/health", async () => ({ status: "ok" }));
 
@@ -157,7 +165,11 @@ export async function buildApp(
       );
       if (!project)
         return reply.code(404).send({ error: "Project not found." });
-      const assetPrefix = `${dependencies.publicBaseUrl ?? "http://127.0.0.1:3001"}/api/assets/`;
+      const publicBaseUrl =
+        typeof dependencies.publicBaseUrl === "function"
+          ? dependencies.publicBaseUrl()
+          : (dependencies.publicBaseUrl ?? "http://127.0.0.1:3001");
+      const assetPrefix = `${publicBaseUrl}/api/assets/`;
       const html = renderHtml(project, assetPrefix);
       const outputPath = path.join(
         dependencies.storage.dataDir,
@@ -169,7 +181,7 @@ export async function buildApp(
         await exportPdf(
           html,
           outputPath,
-          dependencies.publicBaseUrl ?? "http://127.0.0.1:3001",
+          publicBaseUrl,
         );
         return reply.send(
           pdfResponseSchema.parse({

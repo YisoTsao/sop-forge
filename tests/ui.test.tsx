@@ -90,4 +90,61 @@ describe('recording workspace UI', () => {
     expect(screen.queryByRole('button', { name: 'Stop and save session' })).toBeNull();
     expect(previewLink.getAttribute('href')).toBe(`/api/projects/${project.id}/edit`);
   });
+
+  it('shows desktop image export actions and reports completion', async () => {
+    const exportProjectImages = vi.fn().mockResolvedValue({
+      status: 'completed',
+      copied: 1,
+      skipped: 0,
+      failed: 0,
+    });
+    Object.defineProperty(window, 'sopForgeDesktop', {
+      configurable: true,
+      value: { isDesktop: true, exportProjectImages },
+    });
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url === '/api/sessions')
+        return Promise.resolve(response({ sessionId: 'session-ui-test', projectId: project.id }));
+      if (url === `/api/projects/${project.id}`) return Promise.resolve(response(project));
+      return Promise.resolve(response({}));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    render(<App />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Start recording/i }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Download ZIP' }));
+
+    await waitFor(() => {
+      expect(exportProjectImages).toHaveBeenCalledWith(project.id, 'zip');
+    });
+    expect((await screen.findByRole('status')).textContent).toContain('Exported 1 image.');
+  });
+
+  it('reports partial and cancelled desktop image exports', async () => {
+    const exportProjectImages = vi
+      .fn()
+      .mockResolvedValueOnce({ status: 'partial', copied: 1, skipped: 2, failed: 1 })
+      .mockResolvedValueOnce({ status: 'cancelled', copied: 0, skipped: 0, failed: 0 })
+      .mockRejectedValueOnce(new Error('Unable to write export.'));
+    Object.defineProperty(window, 'sopForgeDesktop', {
+      configurable: true,
+      value: { isDesktop: true, exportProjectImages },
+    });
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url === '/api/sessions')
+        return Promise.resolve(response({ sessionId: 'session-ui-test', projectId: project.id }));
+      if (url === `/api/projects/${project.id}`) return Promise.resolve(response(project));
+      return Promise.resolve(response({}));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    render(<App />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Start recording/i }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Download images' }));
+    expect((await screen.findByRole('status')).textContent).toContain('skipped 2, failed 1');
+    fireEvent.click(screen.getByRole('button', { name: 'Download ZIP' }));
+    expect((await screen.findByRole('status')).textContent).toContain('Image export cancelled.');
+    fireEvent.click(screen.getByRole('button', { name: 'Download images' }));
+    expect((await screen.findByRole('alert')).textContent).toContain('Unable to write export.');
+  });
 });

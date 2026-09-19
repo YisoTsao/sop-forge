@@ -3,6 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { buildApp } from '../apps/server/src/app.js';
+import { startLocalServer } from '../apps/server/src/server.js';
 import type { Project } from '../packages/domain/src/index.js';
 import { createStorage } from '../packages/storage/src/index.js';
 import { RecordingSessionManager } from '../packages/recording/src/index.js';
@@ -19,6 +20,55 @@ afterEach(async () => {
 });
 
 describe('local server API', () => {
+  it('starts a reusable loopback server on an ephemeral port', async () => {
+    const dataDir = await mkdtemp(path.join(os.tmpdir(), 'sop-forge-runtime-'));
+    const runtime = await startLocalServer({
+      dataDir,
+      host: '127.0.0.1',
+      port: 0,
+      adapter: { launch: async () => ({}) as BrowserSession },
+    });
+    try {
+      expect(runtime.url).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/);
+      const healthResponse = await fetch(`${runtime.url}/api/health`);
+      expect(healthResponse.status).toBe(200);
+      expect(await healthResponse.json()).toEqual({ status: 'ok' });
+
+      const project: Project = {
+        schemaVersion: 1,
+        id: 'project-runtime-test',
+        title: 'Runtime test',
+        sourceUrl: 'https://example.com',
+        status: 'completed',
+        createdAt: '2026-09-15T00:00:00.000Z',
+        updatedAt: '2026-09-15T00:00:00.000Z',
+        steps: [],
+        assets: [],
+      };
+      runtime.storage.projects.save(project);
+      const projectResponse = await fetch(
+        `${runtime.url}/api/projects/${project.id}`,
+      );
+      expect(projectResponse.status).toBe(200);
+      expect(await projectResponse.json()).toMatchObject({ id: project.id });
+
+      await runtime.storage.assets.write({
+        projectId: project.id,
+        assetId: 'asset-runtime-test',
+        kind: 'original',
+        mimeType: 'image/png',
+        contents: Buffer.from('test-image'),
+      });
+      const assetResponse = await fetch(
+        `${runtime.url}/api/assets/projects/${project.id}/assets/asset-runtime-test.png`,
+      );
+      expect(assetResponse.status).toBe(200);
+    } finally {
+      await runtime.close();
+      await rm(dataDir, { recursive: true, force: true });
+    }
+  });
+
   it('rejects unsupported recording URLs without launching a browser', async () => {
     const dataDir = await mkdtemp(path.join(os.tmpdir(), 'sop-forge-api-'));
     const storage = createStorage(dataDir);

@@ -35,6 +35,7 @@ export function App() {
   const [project, setProject] = useState<Project | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [exportStatus, setExportStatus] = useState<string | null>(null);
 
   useEffect(() => {
     if (!sessionId) return;
@@ -116,6 +117,40 @@ export function App() {
     } catch (reason) {
       setError(
         reason instanceof Error ? reason.message : "Unable to export PDF.",
+      );
+    }
+  }
+
+  async function exportProjectImages(format: "folder" | "zip") {
+    if (!project || !window.sopForgeDesktop) return;
+    setError(null);
+    setExportStatus("Preparing image export...");
+    try {
+      const result = (await window.sopForgeDesktop.exportProjectImages(
+        project.id,
+        format,
+      )) as {
+        status: "completed" | "partial" | "cancelled";
+        copied: number;
+        skipped: number;
+        failed: number;
+      };
+      if (result.status === "cancelled") {
+        setExportStatus("Image export cancelled.");
+        return;
+      }
+      setExportStatus(
+        `Exported ${result.copied} image${result.copied === 1 ? "" : "s"}` +
+          (result.skipped || result.failed
+            ? `, skipped ${result.skipped}, failed ${result.failed}`
+            : "."),
+      );
+    } catch (reason) {
+      setExportStatus(null);
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : "Unable to export project images.",
       );
     }
   }
@@ -247,10 +282,33 @@ export function App() {
                 >
                   Export PDF ↓
                 </button>
+                {window.sopForgeDesktop && (
+                  <>
+                    <button
+                      className="outline-button"
+                      type="button"
+                      onClick={() => void exportProjectImages("folder")}
+                    >
+                      Download images
+                    </button>
+                    <button
+                      className="outline-button"
+                      type="button"
+                      onClick={() => void exportProjectImages("zip")}
+                    >
+                      Download ZIP
+                    </button>
+                  </>
+                )}
               </>
             )}
           </div>
         </div>
+        {exportStatus && (
+          <div className="workspace-status" role="status">
+            {exportStatus}
+          </div>
+        )}
         <div className="workspace-preview-only">
           <aside className="preview-panel">
             <div className="preview-header">
