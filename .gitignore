@@ -9,3 +9,6 @@ dist/
 .DS_Store
 docs
 openspec
+release/
+dist-electron/
+dist-web/
